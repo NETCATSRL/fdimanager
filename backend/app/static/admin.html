@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FDI Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <div class="max-w-6xl mx-auto p-6">
+    <h1 class="text-2xl font-bold mb-4">FDI Admin Panel</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Register User -->
+      <section class="bg-white shadow rounded p-4">
+        <h2 class="font-semibold mb-3">Registro Utente</h2>
+        <div class="space-y-2">
+          <input id="tgid" class="w-full border rounded px-3 py-2" placeholder="Telegram ID" type="number"/>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="first" class="border rounded px-3 py-2" placeholder="Nome"/>
+            <input id="last" class="border rounded px-3 py-2" placeholder="Cognome"/>
+          </div>
+          <input id="phone" class="w-full border rounded px-3 py-2" placeholder="Telefono"/>
+          <input id="email" class="w-full border rounded px-3 py-2" placeholder="Email"/>
+          <select id="level" class="w-full border rounded px-3 py-2">
+            <option value="1">Livello 1 (Simpatizzante)</option>
+            <option value="2">Livello 2 (Tesserato)</option>
+            <option value="3">Livello 3 (Dirigente)</option>
+            <option value="4">Livello 4 (Eletti)</option>
+          </select>
+          <button id="btnRegister" class="bg-blue-600 text-white px-4 py-2 rounded">Registra</button>
+          <pre id="regOut" class="bg-gray-100 p-2 rounded text-sm overflow-auto"></pre>
+        </div>
+      </section>
+
+      <!-- Publish Content -->
+      <section class="bg-white shadow rounded p-4">
+        <h2 class="font-semibold mb-3">Pubblica Contenuto</h2>
+        <div class="space-y-2">
+          <input id="title" class="w-full border rounded px-3 py-2" placeholder="Titolo"/>
+          <textarea id="body" class="w-full border rounded px-3 py-2" rows="4" placeholder="Testo"></textarea>
+          <input id="link" class="w-full border rounded px-3 py-2" placeholder="Link (opzionale)"/>
+          <div class="flex items-center gap-2">
+            <input id="all_levels" type="checkbox"/> <label for="all_levels">Tutti i livelli</label>
+          </div>
+          <input id="levels" class="w-full border rounded px-3 py-2" placeholder="Livelli (es. 2,3)"/>
+          <input id="user_ids" class="w-full border rounded px-3 py-2" placeholder="User IDs (es. 1,2)"/>
+          <button id="btnPublish" class="bg-green-600 text-white px-4 py-2 rounded">Pubblica</button>
+          <pre id="pubOut" class="bg-gray-100 p-2 rounded text-sm overflow-auto"></pre>
+        </div>
+      </section>
+    </div>
+
+    <!-- Users Table -->
+    <section class="bg-white shadow rounded p-4 mt-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold">Utenti</h2>
+        <div class="flex gap-2">
+          <select id="filterStatus" class="border rounded px-2 py-1">
+            <option value="">Tutti</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <select id="filterLevel" class="border rounded px-2 py-1">
+            <option value="">Livello: tutti</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+          <button id="btnReload" class="bg-gray-800 text-white px-3 py-1 rounded">Ricarica</button>
+        </div>
+      </div>
+      <div class="overflow-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left border-b">
+              <th class="py-2">ID</th>
+              <th class="py-2">Telegram</th>
+              <th class="py-2">Nome</th>
+              <th class="py-2">Cognome</th>
+              <th class="py-2">Livello</th>
+              <th class="py-2">Stato</th>
+              <th class="py-2">Azioni</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+<script>
+const API = '/api';
+
+function parseCSV(str) {
+  return (str||'').split(',').map(s=>s.trim()).filter(Boolean);
+}
+
+async function post(url, data) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function del(url) {
+  const r = await fetch(url, {method:'DELETE'});
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function get(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// Register
+const tgid = document.getElementById('tgid');
+const first = document.getElementById('first');
+const last = document.getElementById('last');
+const phone = document.getElementById('phone');
+const email = document.getElementById('email');
+const level = document.getElementById('level');
+const regOut = document.getElementById('regOut');
+document.getElementById('btnRegister').addEventListener('click', async ()=>{
+  try {
+    const data = await post(`${API}/users/register_user`, {
+      telegram_id: Number(tgid.value),
+      first_name: first.value || null,
+      last_name: last.value || null,
+      phone: phone.value || null,
+      email: email.value || null,
+      level: Number(level.value)
+    });
+    regOut.textContent = JSON.stringify(data, null, 2);
+  } catch(e) {
+    regOut.textContent = e.message;
+  }
+});
+
+// Publish
+const title = document.getElementById('title');
+const body = document.getElementById('body');
+const link = document.getElementById('link');
+const all_levels = document.getElementById('all_levels');
+const levels = document.getElementById('levels');
+const user_ids = document.getElementById('user_ids');
+const pubOut = document.getElementById('pubOut');
+
+document.getElementById('btnPublish').addEventListener('click', async ()=>{
+  try {
+    const data = await post(`${API}/contents/publish_content`, {
+      title: title.value,
+      body: body.value,
+      link: link.value || null,
+      targets: {
+        all_levels: all_levels.checked,
+        levels: parseCSV(levels.value).map(Number),
+        user_ids: parseCSV(user_ids.value).map(Number)
+      }
+    });
+    pubOut.textContent = JSON.stringify(data, null, 2);
+  } catch(e) {
+    pubOut.textContent = e.message;
+  }
+});
+
+// Users table
+const usersBody = document.getElementById('usersBody');
+const filterStatus = document.getElementById('filterStatus');
+const filterLevel = document.getElementById('filterLevel');
+
+async function reloadUsers(){
+  let url = `${API}/users`;
+  const qs = [];
+  if (filterStatus.value) qs.push(`status=${encodeURIComponent(filterStatus.value)}`);
+  if (filterLevel.value) qs.push(`level=${encodeURIComponent(filterLevel.value)}`);
+  if (qs.length) url += `?${qs.join('&')}`;
+  const data = await get(url);
+  usersBody.innerHTML = '';
+  for (const u of data){
+    const tr = document.createElement('tr');
+    tr.className = 'border-b';
+    tr.innerHTML = `
+      <td class="py-2">${u.id}</td>
+      <td class="py-2">${u.telegram_id}</td>
+      <td class="py-2">${u.first_name||''}</td>
+      <td class="py-2">${u.last_name||''}</td>
+      <td class="py-2">
+        <select data-user="${u.id}" class="border rounded px-2 py-1 levelSel">
+          ${[1,2,3,4].map(l=>`<option ${u.level===l?'selected':''} value="${l}">${l}</option>`).join('')}
+        </select>
+      </td>
+      <td class="py-2">${u.status}</td>
+      <td class="py-2 flex gap-2">
+        ${u.status==='pending' ? `<button data-approve="${u.id}" class="px-2 py-1 rounded bg-blue-600 text-white">Approva</button>` : ''}
+        <button data-delete="${u.id}" class="px-2 py-1 rounded bg-red-600 text-white">Elimina</button>
+      </td>
+    `;
+    usersBody.appendChild(tr);
+  }
+}
+
+// actions
+usersBody.addEventListener('click', async (e)=>{
+  const t = e.target;
+  if (t.matches('[data-approve]')){
+    const id = Number(t.getAttribute('data-approve'));
+    await post(`${API}/users/approve_user`, {user_id:id, approve:true});
+    await reloadUsers();
+  }
+  if (t.matches('[data-delete]')){
+    const id = Number(t.getAttribute('data-delete'));
+    await del(`${API}/users/${id}`);
+    await reloadUsers();
+  }
+});
+
+usersBody.addEventListener('change', async (e)=>{
+  const t = e.target;
+  if (t.matches('.levelSel')){
+    const id = Number(t.getAttribute('data-user'));
+    const lvl = Number(t.value);
+    await post(`${API}/users/change_level?user_id=${id}&level=${lvl}`, {});
+    await reloadUsers();
+  }
+});
+
+document.getElementById('btnReload').addEventListener('click', reloadUsers);
+filterStatus.addEventListener('change', reloadUsers);
+filterLevel.addEventListener('change', reloadUsers);
+
+reloadUsers();
+</script>
+</body>
+</html>
