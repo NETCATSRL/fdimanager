@@ -10,6 +10,8 @@ class RegisterUserIn(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    indirizzo: Optional[str] = None
+    varie: Optional[str] = None
     level: Level = 1
 
 class UserOut(BaseModel):
@@ -19,6 +21,8 @@ class UserOut(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    indirizzo: Optional[str] = None
+    varie: Optional[str] = None
     level: Level
     status: Status
     approved_by: Optional[int] = None

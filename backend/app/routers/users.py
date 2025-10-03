@@ -18,6 +18,8 @@ def _to_user_out(u: User) -> UserOut:
         last_name=u.last_name,
         phone=u.phone,
         email=u.email,
+        indirizzo=u.indirizzo,
+        varie=u.varie,
         level=u.level,
         status=u.status.value if isinstance(u.status, UserStatus) else u.status,
         approved_by=u.approved_by,
@@ -35,6 +37,8 @@ def register_user(payload: RegisterUserIn, db: Session = Depends(get_db)):
         u.last_name = payload.last_name
         u.phone = payload.phone
         u.email = payload.email
+        u.indirizzo = payload.indirizzo
+        u.varie = payload.varie
         u.level = payload.level
         db.commit()
         db.refresh(u)
@@ -45,6 +49,8 @@ def register_user(payload: RegisterUserIn, db: Session = Depends(get_db)):
         last_name=payload.last_name,
         phone=payload.phone,
         email=payload.email,
+        indirizzo=payload.indirizzo,
+        varie=payload.varie,
         level=payload.level,
         status=target_status,
     )
@@ -86,7 +92,7 @@ async def change_level(user_id: int, level: int, db: Session = Depends(get_db)):
     old_level = u.level
     u.level = level
     db.commit()
-    # Kick from channels beyond new level if level decreased
+    # Kick from channels beyond new level if level decreased (kick without permanent ban)
     if TELEGRAM_BOT_TOKEN and u.telegram_id and old_level > level:
         for l in range(level + 1, old_level + 1):
             channel_id = LEVEL_CHANNELS.get(l)
@@ -100,7 +106,13 @@ async def change_level(user_id: int, level: int, db: Session = Depends(get_db)):
                 try:
                     async with httpx.AsyncClient() as client:
                         await client.post(url_kick, json=payload_kick)
-                    print(f"Kicked {u.telegram_id} from {channel_id}")
+                        # Immediately unban to kick without permanent ban
+                        await client.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/unbanChatMember", json={
+                            "chat_id": channel_id,
+                            "user_id": u.telegram_id,
+                            "only_if_banned": True
+                        })
+                    print(f"Kicked {u.telegram_id} from {channel_id} without permanent ban")
                 except Exception as e:
                     print(f"Error kicking {u.telegram_id} from {channel_id}: {e}")
     # Generate invite links for all levels 1 to current level
@@ -108,16 +120,17 @@ async def change_level(user_id: int, level: int, db: Session = Depends(get_db)):
     for l in range(1, level + 1):
         channel_id = LEVEL_CHANNELS.get(l)
         if TELEGRAM_BOT_TOKEN and channel_id:
-            url_invite = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/exportChatInviteLink"
-            payload_invite = {"chat_id": channel_id}
+            url_invite = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/createChatInviteLink"
+            payload_invite = {"chat_id": channel_id, "expires_in": 0}
             try:
                 async with httpx.AsyncClient() as client:
                     r = await client.post(url_invite, json=payload_invite)
                     if r.status_code == 200:
                         data = r.json()
-                        invite_link = data.get("result")
-                        if invite_link:
-                            invite_links.append(f"Livello {l}: {invite_link}")
+                        if data.get("ok"):
+                            invite_link = data.get("result", {}).get("invite_link")
+                            if invite_link:
+                                invite_links.append(f"Livello {l}: {invite_link}")
             except Exception as e:
                 print(f"Error generating invite link for level {l}: {e}")
     if TELEGRAM_BOT_TOKEN and u.telegram_id:
@@ -140,6 +153,23 @@ def get_user(telegram_id: int, db: Session = Depends(get_db)):
     u = db.query(User).filter(User.telegram_id == telegram_id).first()
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
+    return _to_user_out(u)
+
+@router.put("/{user_id}", response_model=UserOut)
+def update_user(user_id: int, payload: RegisterUserIn, db: Session = Depends(get_db)):
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.first_name = payload.first_name
+    u.last_name = payload.last_name
+    u.phone = payload.phone
+    u.email = payload.email
+    u.indirizzo = payload.indirizzo
+    u.varie = payload.varie
+    # level can be updated but need to handle carefully, maybe separate endpoint for level
+    # u.level = payload.level or something, but for now not update level here
+    db.commit()
+    db.refresh(u)
     return _to_user_out(u)
 
 @router.delete("/{user_id}")
@@ -166,4 +196,11 @@ async def delete_user(user_id: int, db: Session = Depends(get_db)):
                     print(f"Error kicking {u.telegram_id} from {channel_id}: {e}")
     db.delete(u)
     db.commit()
+@router.post("/login")
+def login(payload: dict, db: Session = Depends(get_db)):
+    password = payload.get("password")
+    # Hardcoded password for demo - in production use env or secure method
+    if password == "admin123":
+        return {"access_token": "fake_token", "token_type": "bearer"}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
     return {"deleted": True, "user_id": user_id}

@@ -23,6 +23,8 @@ class User(Base):
     last_name = Column(String)
     phone = Column(String)
     email = Column(String)
+    indirizzo = Column(String)
+    varie = Column(Text)
     level = Column(Integer, nullable=False, default=1)
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active)
     approved_by = Column(Integer, nullable=True)

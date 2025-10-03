@@ -69,8 +69,8 @@ async def register(message: Message):
             ch_id = LEVEL_CHANNELS.get(l)
             if ch_id:
                 try:
-                    inv_link = await bot.export_chat_invite_link(ch_id)
-                    invite_lines.append(f"Livello {l}: {inv_link}")
+                    inv_link = await bot.create_chat_invite_link(ch_id)
+                    invite_lines.append(f"Livello {l}: {inv_link.invite_link}")
                 except Exception as e:
                     invite_lines.append(f"Livello {l}: Errore nel generare link - {str(e)}")
             else:
@@ -112,8 +112,8 @@ async def my_level(message: Message):
             ch_id = LEVEL_CHANNELS.get(l)
             if ch_id:
                 try:
-                    inv_link = await bot.export_chat_invite_link(ch_id)
-                    invite_lines.append(f"Livello {l}: {inv_link}")
+                    inv_link = await bot.create_chat_invite_link(ch_id)
+                    invite_lines.append(f"Livello {l}: {inv_link.invite_link}")
                 except Exception as e:
                     invite_lines.append(f"Livello {l}: Errore nel generare link - {str(e)}")
             else:
